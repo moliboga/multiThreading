@@ -6,6 +6,7 @@ import java.io.IOException;
 public class MyRunnable implements Runnable {
 
     private final BufferedReader reader;
+    private volatile int counter;
 
     public MyRunnable(BufferedReader reader) {
         this.reader = reader;
@@ -13,15 +14,17 @@ public class MyRunnable implements Runnable {
 
     @Override
     public void run() {
-        for (int i = 0; i < 50000; i++) {
+        for (int i = 0; i < 500000; i++) {
             try {
                 String line = reader.readLine();
-                char[] ch = line.toCharArray();
-                Bubble.bubbleSort(ch);
-//                System.out.println((new String(ch)).trim());
+                counter += line.split(" ").length;
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public int getCounter() {
+        return counter;
     }
 }

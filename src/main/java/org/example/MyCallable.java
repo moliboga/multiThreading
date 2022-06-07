@@ -13,17 +13,16 @@ public class MyCallable implements Callable {
     }
 
     @Override
-    public Object call() throws Exception {
+    public Integer call() {
+        int counter = 0;
         for (int i = 0; i < 100000; i++) {
             try {
                 String line = reader.readLine();
-                char[] ch = line.toCharArray();
-                Bubble.bubbleSort(ch);
-//                System.out.println((new String(ch)).trim());
+                counter += line.split(" ").length;
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
-        return null;
+        return counter;
     }
 }
