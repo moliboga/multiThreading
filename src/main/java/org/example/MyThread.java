@@ -9,21 +9,25 @@ import java.nio.file.Paths;
 public class MyThread extends Thread {
 
     private final BufferedReader reader;
+    private int counter;
     public MyThread(BufferedReader reader) {
         this.reader = reader;
+        counter = 0;
     }
 
     @Override
     public void run() {
-        for (int i = 0; i < 500000; i++){
+        for (int i = 0; i < 500000; i++) {
             try {
                 String line = reader.readLine();
-                char[] ch = line.toCharArray();
-                Bubble.bubbleSort(ch);
-//                System.out.println((new String(ch)).trim());
+                counter += line.split(" ").length;
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public int getCounter() {
+        return counter;
     }
 }

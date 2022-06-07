@@ -13,15 +13,11 @@ public class MyCallable implements Callable {
     }
 
     @Override
-    public Integer call() {
+    public Integer call() throws IOException {
         int counter = 0;
-        for (int i = 0; i < 100000; i++) {
-            try {
-                String line = reader.readLine();
-                counter += line.split(" ").length;
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+        for (int i = 0; i < 250000; i++) {
+            String line = reader.readLine();
+            counter += line.split(" ").length;
         }
         return counter;
     }
