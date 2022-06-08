@@ -1,65 +1,80 @@
 package org.example;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class Main {
 
-    private static int doSomething()
-            throws ExecutionException, InterruptedException, IOException {
+    public static void doQueries() throws IOException, InterruptedException, ParseException {
+        int variant = 0;
 
         long time = System.currentTimeMillis();
-        AtomicInteger counter = new AtomicInteger();
 
-        int chunks = Runtime.getRuntime().availableProcessors();
-        long[] offsets = new long[chunks];
-        File file = new File("src/main/resources/enwik8.txt");
-
-        // determine line boundaries for number of chunks
-        RandomAccessFile raf = new RandomAccessFile(file, "r");
-        for (int i = 1; i < chunks; i++) {
-            raf.seek(i * file.length() / chunks);
-            while (true) {
-                int read = raf.read();
-                if (read == '\n' || read == -1) {
-                    break;
-                }
-            }
-            offsets[i] = raf.getFilePointer();
+        if (variant == 0){
+            doMultiThreading();
         }
-        raf.close();
-
-        // process each chunk using a thread for each one
-        ExecutorService executorService = Executors.newFixedThreadPool(chunks);
-        List<Callable<Integer>> tasks = new ArrayList<>();
-        for (int i = 0; i < chunks; i++) {
-            long start = offsets[i];
-            long end = i < chunks - 1 ? offsets[i + 1] : file.length();
-            tasks.add(new FileProcessor(file, start, end));
+        else if (variant == 1){
+            dummy();
         }
-        List<Future<Integer>> results = executorService.invokeAll(tasks);
-        executorService.shutdown();
-
-        results.forEach(result -> {
-            try {
-                counter.addAndGet(result.get());
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        });
-
-        System.out.println(counter.get());
 
         System.out.println(System.currentTimeMillis() - time);
-        return counter.get();
     }
-    public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
-        System.out.println(doSomething());
+
+    private static void dummy() throws InterruptedException, IOException, ParseException {
+        int productSize = 30;
+        double ratingSum = 0;
+        var client = HttpClient.newHttpClient();
+
+        for (int i = 1; i <= productSize; i++) {
+            var request = HttpRequest.newBuilder(
+                            URI.create("https://dummyjson.com/products/" + i))
+                    .GET()
+                    .build();
+            Thread.sleep(2000);
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            JSONObject json = (JSONObject) new JSONParser().parse(response.body());
+            double rating = Double.parseDouble(json.get("rating").toString());
+            System.out.println(rating);
+            ratingSum += rating;
+        }
+
+        System.out.println(ratingSum / productSize);
+    }
+
+    private static void doMultiThreading() throws InterruptedException {
+        AtomicReference<Double> ratingSum = new AtomicReference<>(0.0);
+        int productSize = 30;
+
+        ExecutorService executorService = Executors.newFixedThreadPool(productSize);
+        List<Callable<Double>> tasks = new ArrayList<>();
+        for (int i = 1; i <= productSize; i++) {
+            tasks.add(new RequestCallable(i));
+        }
+        List<Future<Double>> results = executorService.invokeAll(tasks);
+        executorService.shutdown();
+
+        results.forEach(result -> ratingSum.updateAndGet(v -> {
+            try {
+                return v + result.get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        }));
+
+        System.out.println(ratingSum.get() / productSize);
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException, ParseException {
+        doQueries();
     }
 }
-
