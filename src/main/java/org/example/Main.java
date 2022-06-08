@@ -16,21 +16,17 @@ import java.util.concurrent.atomic.AtomicReference;
 public class Main {
 
     public static void doQueries() throws IOException, InterruptedException, ParseException {
-        int variant = 0;
 
         long time = System.currentTimeMillis();
+        System.out.println("Using dummy one-thread method:\nAvg is " + dummy());
+        System.out.println("Time is: " + (System.currentTimeMillis() - time));
 
-        if (variant == 0){
-            doMultiThreading();
-        }
-        else if (variant == 1){
-            dummy();
-        }
-
-        System.out.println(System.currentTimeMillis() - time);
+        time = System.currentTimeMillis();
+        System.out.println("Using multi-thread method:\nAvg is " + doMultiThreading());
+        System.out.println("Time is: " + (System.currentTimeMillis() - time));
     }
 
-    private static void dummy() throws InterruptedException, IOException, ParseException {
+    private static double dummy() throws InterruptedException, IOException, ParseException {
         int productSize = 30;
         double ratingSum = 0;
         var client = HttpClient.newHttpClient();
@@ -40,7 +36,7 @@ public class Main {
                             URI.create("https://dummyjson.com/products/" + i))
                     .GET()
                     .build();
-            Thread.sleep(2000);
+            Thread.sleep(500);
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());
             JSONObject json = (JSONObject) new JSONParser().parse(response.body());
             double rating = Double.parseDouble(json.get("rating").toString());
@@ -48,10 +44,10 @@ public class Main {
             ratingSum += rating;
         }
 
-        System.out.println(ratingSum / productSize);
+        return ratingSum / productSize;
     }
 
-    private static void doMultiThreading() throws InterruptedException {
+    private static double doMultiThreading() throws InterruptedException {
         AtomicReference<Double> ratingSum = new AtomicReference<>(0.0);
         int productSize = 30;
 
@@ -71,7 +67,7 @@ public class Main {
             }
         }));
 
-        System.out.println(ratingSum.get() / productSize);
+        return ratingSum.get() / productSize;
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, ParseException {
