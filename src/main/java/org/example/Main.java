@@ -1,64 +1,62 @@
 package org.example;
 
-import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
 
     private static int doSomething()
             throws ExecutionException, InterruptedException, IOException {
 
-        Path path = Paths.get("src/main/resources/enwik8.txt");
-        BufferedReader reader;
-        try {
-            reader = Files.newBufferedReader(path);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        int variant = 2;
-        int counter = 0;
         long time = System.currentTimeMillis();
+        AtomicInteger counter = new AtomicInteger();
 
-        if (variant == 0){
-            ExecutorService executorService = Executors.newFixedThreadPool(10);
-            for (int i = 0; i < 4; i++){
-                Future<Integer> future = executorService.submit(new MyCallable(reader));
-                counter += future.get();
+        int chunks = Runtime.getRuntime().availableProcessors();
+        long[] offsets = new long[chunks];
+        File file = new File("src/main/resources/enwik8.txt");
+
+        // determine line boundaries for number of chunks
+        RandomAccessFile raf = new RandomAccessFile(file, "r");
+        for (int i = 1; i < chunks; i++) {
+            raf.seek(i * file.length() / chunks);
+            while (true) {
+                int read = raf.read();
+                if (read == '\n' || read == -1) {
+                    break;
+                }
             }
-            executorService.shutdown();
+            offsets[i] = raf.getFilePointer();
         }
-        else if (variant == 1){
-            for (int i = 0; i < 1000000; i++) {
-                String line = reader.readLine();
-                counter += line.split(" ").length;
-            } // 12875192
+        raf.close();
+
+        // process each chunk using a thread for each one
+        ExecutorService executorService = Executors.newFixedThreadPool(chunks);
+        List<Callable<Integer>> tasks = new ArrayList<>();
+        for (int i = 0; i < chunks; i++) {
+            long start = offsets[i];
+            long end = i < chunks - 1 ? offsets[i + 1] : file.length();
+            tasks.add(new FileProcessor(file, start, end));
         }
-        else if (variant == 2){
-            List<MyThread> threads = new ArrayList<>();
-            for (int idx = 0; idx < 2; ++idx) {
-                threads.add(new MyThread(reader));
-                threads.get(idx).start();
+        List<Future<Integer>> results = executorService.invokeAll(tasks);
+        executorService.shutdown();
+
+        results.forEach(result -> {
+            try {
+                counter.addAndGet(result.get());
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
             }
-            int total = 0;
-            for (MyThread thread : threads) {
-                thread.join();
-                total += thread.getCounter();
-            }
-            counter = total;
-        }
+        });
+
+        System.out.println(counter.get());
 
         System.out.println(System.currentTimeMillis() - time);
-        return counter;
+        return counter.get();
     }
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
         System.out.println(doSomething());
